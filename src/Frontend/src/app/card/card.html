@@ -1,10 +1,14 @@
-<div [class]="cardClass" [ngStyle]="gradientStyle">    <!-- Contenedor del Título -->
+{{currentCard | json}}
+{{currentCard}}
+{{currentCard.nombre}}
+<h1>VALOR DEL JSON</h1>
+<div [class]="cardClass" [ngStyle]="gradientStyle"> <!-- Contenedor del Título -->
     <div class="text-center mb-4">
         <h2 class="text-2xl font-bold text-white uppercase tracking-widest drop-shadow-md">
             {{ currentCard.nombre}}
         </h2>
     </div>
-    
+
     <!-- Contenedor de Imagen con Estilo Retro -->
     <div class="border-3 border-slate-800 p-2 shadow-inner bg-white">
         <img [src]="currentCard.imagen" [alt]="currentCard.nombre" class="w-full h-auto object-cover" />

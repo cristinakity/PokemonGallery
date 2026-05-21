@@ -146,7 +146,7 @@ export class Gallery implements OnInit {
       next: (data) => {
         this.pokeList.set(data);
         console.log(this.pokeList);
-        this.pokeListFull = data;
+        this.pokeListFull = [...data];
       },
       error: (err) => {
         console.error(err);
@@ -155,7 +155,13 @@ export class Gallery implements OnInit {
   }
 
   findSearch(searchName: string) {
-    this.pokeList.set([...this.pokeListFull]);
-    this.pokeList.set(this.pokeListFull.filter(poke => poke.nombre.toLowerCase().includes(searchName.toLowerCase())));
+    // this.pokeList.set([...this.pokeListFull]);
+    this.pokeList.update(current => [
+      ...this.pokeListFull
+    ])
+    // this.pokeList.set(this.pokeListFull.filter(poke => poke.nombre.toLowerCase().includes(searchName.toLowerCase())));
+    this.pokeList.update(current => [
+      ...this.pokeListFull.filter(poke => poke.nombre.toLowerCase().includes(searchName.toLowerCase()))
+    ])
   }
 }
