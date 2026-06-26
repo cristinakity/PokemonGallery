@@ -20,6 +20,27 @@ public class PokemonService
         var sqlQuery = "SELECT * FROM Pokemon";
         var pokeDB = await _dbConnection.QueryAsync<PokeCard>(sqlQuery);
         pokemons = pokeDB.ToList();
+
+        var queryTypes = "SELECT * FROM Type";
+        var typeDB = await _dbConnection.QueryAsync<PokeType>(queryTypes);
+        var types = typeDB.ToList();
+
+        foreach (var pokemon in pokemons)
+        {
+            var queryPokeTypes = "SELECT TypeId FROM PokemonTypes WHERE PokedexNumber = @PokedexNumber";
+            var pokeTypesDB = await _dbConnection.QueryAsync<int>(queryPokeTypes,
+            new { PokedexNumber = pokemon.PokedexNumber }
+            );
+            var pokemonTypes = pokeTypesDB.ToList();
+            foreach (var typeId in pokemonTypes)
+            {
+                var currentType = types.FirstOrDefault(x => x.TypeId == typeId);
+                pokemon.Type = pokemon.Type ?? new List<PokeType>();
+                pokemon.Type.Add(currentType!);
+            }
+        }
+
+
         // PokeCard bulbasaur = new PokeCard()
         // {
         //     Nombre = "Bulbasaur",

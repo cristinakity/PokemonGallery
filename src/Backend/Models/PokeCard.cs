@@ -10,7 +10,7 @@ public class PokeCard
 
 public class PokeType
 {
-    public required int PokeTypeId { get; set; }
+    public required int TypeId { get; set; }
     public required string Type { get; set; }
     public required string Color { get; set; }
 }
