@@ -1,0 +1,33 @@
+{
+	"name": ".NET (C#), Node.js (TypeScript) & MS SQL - Bazzite Podman",
+	"dockerComposeFile": "../docker-compose.podman.yml",
+	"service": "app-podman",
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"mssql.connections": [
+					{
+						"server": "db-podman,1433",
+						"database": "",
+						"authenticationType": "SqlLogin",
+						"user": "sa",
+						"password": "P@ssw0rd",
+						"emptyPasswordInput": false,
+						"savePassword": true,
+						"profileName": "mssql-container"
+					}
+				]
+			},
+			"extensions": [
+				"ms-dotnettools.csharp",
+				"ms-mssql.mssql"
+			]
+		}
+	},
+	"postCreateCommand": "bash .devcontainer/mssql/postCreateCommand.podman.sh 'P@ssw0rd' './bin/Debug/' './.devcontainer/mssql/'",
+	"features": {
+		"ghcr.io/devcontainers-extra/features/angular-cli:2": {},
+		"ghcr.io/helpers4/devcontainer/angular-dev:1": {}
+	}
+}
