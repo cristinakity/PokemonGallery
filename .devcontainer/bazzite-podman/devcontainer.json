@@ -29,5 +29,6 @@
 	"features": {
 		"ghcr.io/devcontainers-extra/features/angular-cli:2": {},
 		"ghcr.io/helpers4/devcontainer/angular-dev:1": {}
-	}
+	},
+	"remoteUser": "root"
 }

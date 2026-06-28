@@ -17,6 +17,8 @@ services:
 
     command: sleep infinity
 
+    user: root
+
   db-podman:
     image: mcr.microsoft.com/mssql/server:2019-latest
     restart: unless-stopped
