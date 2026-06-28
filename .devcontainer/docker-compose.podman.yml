@@ -11,6 +11,7 @@ services:
 
     environment:
       SQL_HOST: db-podman
+      ConnectionStrings__PokemonConection: "Server=db-podman,1433;Database=ApplicationDB;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;"
 
     volumes:
       - ../..:/workspaces:cached,Z

@@ -6,10 +6,9 @@ dacpath=$2
 sqlpath=$3
 sqlhost=${SQL_HOST:-db-podman}
 
-echo "SELECT * FROM SYS.DATABASES" | dd of=testsqlconnection.sql
 for i in {1..60};
 do
-    /opt/mssql-tools/bin/sqlcmd -S $sqlhost -U sa -P $SApassword -d master -i testsqlconnection.sql > /dev/null
+    /opt/mssql-tools/bin/sqlcmd -S $sqlhost -U sa -P $SApassword -d master -Q "SELECT * FROM SYS.DATABASES" > /dev/null
     if [ $? -eq 0 ]
     then
         echo "SQL server ready"
@@ -19,7 +18,6 @@ do
         sleep 1
     fi
 done
-rm testsqlconnection.sql
 
 for f in $dacpath/*
 do
