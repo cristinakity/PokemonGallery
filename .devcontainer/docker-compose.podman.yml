@@ -13,7 +13,7 @@ services:
       SQL_HOST: db-podman
 
     volumes:
-      - ../..:/workspaces:cached
+      - ../..:/workspaces:cached,Z
 
     command: sleep infinity
 
