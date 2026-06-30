@@ -1,0 +1,10 @@
+.git
+.github
+.env
+.env.production
+.env.production.local
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/.angular

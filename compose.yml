@@ -1,0 +1,56 @@
+name: pokemongallery
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
+    container_name: pokemongallery-backend
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__PokemonConection: Server=sqlserver,1433;Database=PokemonesDB;User Id=pokemongallery_app;Password=${POKEMONGALLERY_DB_PASSWORD:?POKEMONGALLERY_DB_PASSWORD is required};Encrypt=True;TrustServerCertificate=True;
+      Jwt__Key: ${JWT_KEY:?JWT_KEY is required}
+      Jwt__Issuer: ${JWT_ISSUER:?JWT_ISSUER is required}
+      Jwt__Audience: ${JWT_AUDIENCE:?JWT_AUDIENCE is required}
+      Cors__FrontendOrigin: https://${APP_DOMAIN:?APP_DOMAIN is required}
+    networks:
+      vps_shared:
+        aliases:
+          - pokemongallery-backend
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
+    container_name: pokemongallery-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      vps_shared:
+        aliases:
+          - pokemongallery-frontend
+
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      POKEMONGALLERY_MIGRATOR_PASSWORD: ${POKEMONGALLERY_MIGRATOR_PASSWORD:?POKEMONGALLERY_MIGRATOR_PASSWORD is required}
+      INITIAL_ADMIN_USER: ${INITIAL_ADMIN_USER:?INITIAL_ADMIN_USER is required}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?INITIAL_ADMIN_PASSWORD is required}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        /opt/mssql-tools18/bin/sqlcmd \
+          -S sqlserver -U pokemongallery_migrator \
+          -P "$$POKEMONGALLERY_MIGRATOR_PASSWORD" -C -b \
+          -i /scripts/init.sql \
+          -v "InitialAdminUser=$$INITIAL_ADMIN_USER" \
+             "InitialAdminPassword=$$INITIAL_ADMIN_PASSWORD"
+    volumes:
+      - ./deploy/sql:/scripts:ro,Z
+      - ./docs/SQLScripts:/seed:ro,Z
+    networks:
+      - vps_shared
+
+networks:
+  vps_shared:
+    external: true
+    name: vps_shared

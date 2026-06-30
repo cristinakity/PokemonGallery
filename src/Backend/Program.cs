@@ -12,6 +12,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,18 +53,19 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-builder.Services.AddCors(
-    options =>
+var frontendOrigin = builder.Configuration["Cors:FrontendOrigin"] 
+                     ?? "http://localhost:4200";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AngularPolicy", policy =>
     {
-        options.AddPolicy("AngularPolicy", policy =>
-        {
-            policy
-            .WithOrigins("http://localhost:4200")
+        policy
+            .WithOrigins(frontendOrigin)
             .AllowAnyHeader()
             .AllowAnyMethod();
-        });
-    }
-);
+    });
+});
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 
@@ -83,15 +85,30 @@ builder.Services
         };
     });
 
+// Caddy termina HTTPS y reenvia la solicitud al backend por la red privada de Podman.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    // El backend no publica puertos en el host: solo Caddy puede alcanzarlo por vps_shared.
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 builder.Services.AddAuthorization();
 // SERVICIOS PROPIOS
 builder.Services.AddTransient<PokemonService>();
 builder.Services.AddTransient<LoginService>();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
+app.UseHttpsRedirection();
+app.UseCors("AngularPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors("AngularPolicy");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -100,7 +117,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 
 var summaries = new[]
 {
