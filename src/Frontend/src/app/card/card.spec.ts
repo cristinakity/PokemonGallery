@@ -13,6 +13,12 @@ describe('Card', () => {
 
     fixture = TestBed.createComponent(Card);
     component = fixture.componentInstance;
+    fixture.componentRef.setInput('currentCard', {
+      nombre: 'Pikachu',
+      pokedexNumber: 25,
+      imagen: 'pikachu.png',
+      type: [],
+    });
     await fixture.whenStable();
   });
 
