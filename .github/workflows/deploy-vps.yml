@@ -96,13 +96,23 @@ jobs:
         run: |
           set -euo pipefail
 
-          for value in POKEMONGALLERY_DB_PASSWORD POKEMONGALLERY_MIGRATOR_PASSWORD JWT_KEY INITIAL_ADMIN_PASSWORD; do
-            secret="${!value}"
-            if [[ ! "$secret" =~ ^[A-Za-z0-9_+=/@%.,:!-]{16,128}$ ]]; then
-              echo "$value must be 16-128 characters and cannot contain quotes, spaces or dollar signs."
+          validate_secret() {
+            local name="$1"
+            local minimum_length="$2"
+            local secret="${!name}"
+
+            if (( ${#secret} < minimum_length || ${#secret} > 128 )) || \
+               [[ "$secret" =~ [[:space:]] ]] || \
+               [[ "$secret" == *\'* || "$secret" == *\"* || "$secret" == *\$* ]]; then
+              echo "$name must be $minimum_length-128 characters and cannot contain quotes, whitespace or dollar signs."
               exit 1
             fi
-          done
+          }
+
+          validate_secret POKEMONGALLERY_DB_PASSWORD 16
+          validate_secret POKEMONGALLERY_MIGRATOR_PASSWORD 16
+          validate_secret JWT_KEY 16
+          validate_secret INITIAL_ADMIN_PASSWORD 8
 
           if [[ ! "$APP_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || \
              [[ ! "$JWT_ISSUER" =~ ^[A-Za-z0-9_.-]+$ ]] || \
