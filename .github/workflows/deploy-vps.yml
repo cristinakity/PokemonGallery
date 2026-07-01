@@ -238,10 +238,14 @@ jobs:
             compose() { podman-compose --env-file .env "$@"; }
           fi
 
+          echo "Running database initialization..."
           compose pull backend frontend db-init
-          compose run --rm db-init
+          compose run --rm db-init </dev/null
+
+          echo "Starting PokemonGallery containers..."
           compose up -d backend frontend
 
+          echo "Waiting for the backend health check..."
           for attempt in $(seq 1 20); do
             if podman exec pokemongallery-frontend \
               wget --header='X-Forwarded-Proto: https' \
@@ -254,10 +258,18 @@ jobs:
             fi
             sleep 3
           done
+
+          echo "Application containers are healthy."
+          compose ps
+
           if ! curl --fail --silent --show-error --retry 5 --retry-delay 3 "https://$APP_DOMAIN/" >/dev/null; then
-            echo "Warning: internal deployment is healthy, but public HTTPS is not ready yet. Check DNS and Caddy logs."
+            echo "::error::The application is healthy internally, but https://$APP_DOMAIN is unavailable."
+            echo "Check that the public DNS A record points to this VPS. Recent Caddy logs:"
+            podman logs vps-caddy --tail=100 || true
+            exit 1
           fi
 
+          echo "Public HTTPS check succeeded: https://$APP_DOMAIN/"
+
           podman image prune -f
-          compose ps
           REMOTE
