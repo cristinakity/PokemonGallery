@@ -1,0 +1,215 @@
+name: Deploy PokemonGallery to VPS
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: pokemongallery-RackNerd
+  cancel-in-progress: false
+
+env:
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/pokemongallery-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/pokemongallery-frontend
+
+jobs:
+  test-build-deploy:
+    runs-on: ubuntu-latest
+    environment: RackNerd
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/Frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: src/Frontend
+        run: npm install
+
+      - name: Test frontend
+        working-directory: src/Frontend
+        run: npm test -- --watch=false
+
+      - name: Build frontend
+        working-directory: src/Frontend
+        run: npm run build
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build backend
+        run: dotnet build src/Backend/Backend.csproj --configuration Release
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR for publishing
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+
+      - name: Prepare deployment files
+        env:
+          APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+          JWT_ISSUER: ${{ vars.JWT_ISSUER }}
+          JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
+          INITIAL_ADMIN_USER: ${{ vars.INITIAL_ADMIN_USER }}
+          POKEMONGALLERY_DB_PASSWORD: ${{ secrets.POKEMONGALLERY_DB_PASSWORD }}
+          POKEMONGALLERY_MIGRATOR_PASSWORD: ${{ secrets.POKEMONGALLERY_MIGRATOR_PASSWORD }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+          INITIAL_ADMIN_PASSWORD: ${{ secrets.INITIAL_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          for value in POKEMONGALLERY_DB_PASSWORD POKEMONGALLERY_MIGRATOR_PASSWORD JWT_KEY INITIAL_ADMIN_PASSWORD; do
+            secret="${!value}"
+            if [[ ! "$secret" =~ ^[A-Za-z0-9_+=/@%.,:!-]{16,128}$ ]]; then
+              echo "$value must be 16-128 characters and cannot contain quotes, spaces or dollar signs."
+              exit 1
+            fi
+          done
+
+          if [[ ! "$APP_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || \
+             [[ ! "$JWT_ISSUER" =~ ^[A-Za-z0-9_.-]+$ ]] || \
+             [[ ! "$JWT_AUDIENCE" =~ ^[A-Za-z0-9_.-]+$ ]] || \
+             [[ ! "$INITIAL_ADMIN_USER" =~ ^[A-Za-z0-9_.-]{1,50}$ ]]; then
+            echo "One or more required production variables are empty."
+            exit 1
+          fi
+
+          mkdir -p deployment/deploy/sql deployment/docs/SQLScripts
+          cp compose.yml deployment/
+          cp deploy/sql/init.sql deployment/deploy/sql/
+          cp docs/SQLScripts/SeedPokemons.sql deployment/docs/SQLScripts/
+
+          {
+            printf "APP_DOMAIN='%s'\n" "$APP_DOMAIN"
+            printf "BACKEND_IMAGE='%s:%s'\n" "$BACKEND_IMAGE" "$GITHUB_SHA"
+            printf "FRONTEND_IMAGE='%s:%s'\n" "$FRONTEND_IMAGE" "$GITHUB_SHA"
+            printf "POKEMONGALLERY_DB_PASSWORD='%s'\n" "$POKEMONGALLERY_DB_PASSWORD"
+            printf "POKEMONGALLERY_MIGRATOR_PASSWORD='%s'\n" "$POKEMONGALLERY_MIGRATOR_PASSWORD"
+            printf "JWT_KEY='%s'\n" "$JWT_KEY"
+            printf "JWT_ISSUER='%s'\n" "$JWT_ISSUER"
+            printf "JWT_AUDIENCE='%s'\n" "$JWT_AUDIENCE"
+            printf "INITIAL_ADMIN_USER='%s'\n" "$INITIAL_ADMIN_USER"
+            printf "INITIAL_ADMIN_PASSWORD='%s'\n" "$INITIAL_ADMIN_PASSWORD"
+          } > deployment/.env
+
+          tar -C deployment -czf pokemongallery-deployment.tar.gz .
+
+      - name: Deploy with Podman Compose
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USER }}
+          VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT }}
+          VPS_KNOWN_HOSTS: ${{ vars.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          GHCR_USER: ${{ github.repository_owner }}
+          APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+        run: |
+          set -euo pipefail
+          port="${VPS_SSH_PORT:-22}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/pokemongallery_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/pokemongallery_key ~/.ssh/known_hosts
+
+          printf '%s' "$GHCR_READ_TOKEN" > /tmp/ghcr-read-token
+          chmod 600 /tmp/ghcr-read-token
+
+          scp -i ~/.ssh/pokemongallery_key -P "$port" \
+            pokemongallery-deployment.tar.gz /tmp/ghcr-read-token \
+            "$VPS_USER@$VPS_HOST:/tmp/"
+          rm -f /tmp/ghcr-read-token
+
+          ssh -i ~/.ssh/pokemongallery_key -p "$port" \
+            "$VPS_USER@$VPS_HOST" \
+            "GHCR_USER='$GHCR_USER' APP_DOMAIN='$APP_DOMAIN' bash -s" <<'REMOTE'
+          set -euo pipefail
+          GHCR_READ_TOKEN="$(cat /tmp/ghcr-read-token)"
+          rm -f /tmp/ghcr-read-token
+
+          export DEBIAN_FRONTEND=noninteractive
+          if ! command -v podman >/dev/null 2>&1 || ! command -v podman-compose >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y podman podman-compose curl
+          fi
+
+          if ! podman network exists vps_shared || ! podman container exists sqlserver; then
+            echo "VpsInfrastructure must be deployed before PokemonGallery."
+            exit 1
+          fi
+
+          install -d -m 700 /opt/apps/PokemonGallery
+          tar -xzf /tmp/pokemongallery-deployment.tar.gz -C /opt/apps/PokemonGallery
+          rm -f /tmp/pokemongallery-deployment.tar.gz
+          chmod 600 /opt/apps/PokemonGallery/.env
+          cd /opt/apps/PokemonGallery
+
+          printf '%s' "$GHCR_READ_TOKEN" | podman login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          if podman compose version >/dev/null 2>&1; then
+            compose() { podman compose --env-file .env "$@"; }
+          else
+            compose() { podman-compose --env-file .env "$@"; }
+          fi
+
+          compose pull backend frontend db-init
+          compose run --rm db-init
+          compose up -d backend frontend
+
+          for attempt in $(seq 1 20); do
+            if podman exec pokemongallery-frontend \
+              wget --header='X-Forwarded-Proto: https' \
+                -qO- http://pokemongallery-backend:8080/weatherforecast >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              compose logs --tail=200 backend frontend
+              exit 1
+            fi
+            sleep 3
+          done
+          if ! curl --fail --silent --show-error --retry 5 --retry-delay 3 "https://$APP_DOMAIN/" >/dev/null; then
+            echo "Warning: internal deployment is healthy, but public HTTPS is not ready yet. Check DNS and Caddy logs."
+          fi
+
+          podman image prune -f
+          compose ps
+          REMOTE

@@ -11,7 +11,7 @@ services:
 
     environment:
       SQL_HOST: db-podman
-      ConnectionStrings__PokemonConection: "Server=db-podman,1433;Database=ApplicationDB;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;"
+      ConnectionStrings__PokemonConection: "Server=db-podman,1433;Database=PokemonesDB;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;"
 
     volumes:
       - ../..:/workspaces:cached,Z
@@ -24,5 +24,5 @@ services:
     image: mcr.microsoft.com/mssql/server:2019-latest
     restart: unless-stopped
     environment:
-      SA_PASSWORD: P@ssw0rd
+      MSSQL_SA_PASSWORD: P@ssw0rd
       ACCEPT_EULA: Y

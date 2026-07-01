@@ -2,7 +2,7 @@ SELECT TOP (1000)
     [TypeId]
       , [Type]
       , [Color]
-FROM [ApplicationDB].[dbo].[Type]
+FROM [PokemonesDB].[dbo].[Type]
 
 INSERT INTO [Type]
 SELECT 1, 'RAYO', '#FFF123'
@@ -23,3 +23,10 @@ SELECT p.PokedexNumber, p.Nombre, t.TypeId, t.Type
 FROM Pokemon p
     LEFT JOIN PokemonTypes pt ON p.PokedexNumber = pt.PokedexNumber
     LEFT JOIN Type t ON pt.TypeId = t.TypeId
+
+
+/*
+INSERT INTO USERS Select 'admin', 'Admin123'
+*/
+
+select * from USERS

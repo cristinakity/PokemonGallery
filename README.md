@@ -1,3 +1,8 @@
+# PokemonGallery
+
+La guía completa para desplegar Angular, .NET y `PokemonesDB` en un VPS con Podman Compose,
+Caddy y GitHub Actions está en [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 HOLA ESTA ES UNA EXPLICACION DE MARKDOWN.
 
 ```javascript
