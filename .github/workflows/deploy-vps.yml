@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: pokemongallery-production
+  group: pokemongallery-RackNerd
   cancel-in-progress: false
 
 env:
@@ -20,7 +20,7 @@ env:
 jobs:
   test-build-deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: RackNerd
 
     steps:
       - name: Checkout
