@@ -96,6 +96,30 @@ jobs:
         run: |
           set -euo pipefail
 
+          require_value() {
+            local name="$1"
+
+            if [[ ! -v "$name" ]] || [[ -z "${!name}" ]]; then
+              echo "::error::$name is empty or is not configured in the RackNerd GitHub Environment."
+              exit 1
+            fi
+
+            echo "$name is configured."
+          }
+
+          echo "Checking required deployment configuration..."
+          for name in \
+            APP_DOMAIN \
+            JWT_ISSUER \
+            JWT_AUDIENCE \
+            INITIAL_ADMIN_USER \
+            POKEMONGALLERY_DB_PASSWORD \
+            POKEMONGALLERY_MIGRATOR_PASSWORD \
+            JWT_KEY \
+            INITIAL_ADMIN_PASSWORD; do
+            require_value "$name"
+          done
+
           validate_secret() {
             local name="$1"
             local minimum_length="$2"
@@ -104,7 +128,8 @@ jobs:
             if (( ${#secret} < minimum_length || ${#secret} > 128 )) || \
                [[ "$secret" =~ [[:space:]] ]] || \
                [[ "$secret" == *\'* || "$secret" == *\"* || "$secret" == *\$* ]]; then
-              echo "$name must be $minimum_length-128 characters and cannot contain quotes, whitespace or dollar signs."
+              echo "$name must be $minimum_length-128 characters and cannot contain quotes," \
+                "whitespace or dollar signs."
               exit 1
             fi
           }
@@ -114,11 +139,24 @@ jobs:
           validate_secret JWT_KEY 16
           validate_secret INITIAL_ADMIN_PASSWORD 8
 
-          if [[ ! "$APP_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || \
-             [[ ! "$JWT_ISSUER" =~ ^[A-Za-z0-9_.-]+$ ]] || \
-             [[ ! "$JWT_AUDIENCE" =~ ^[A-Za-z0-9_.-]+$ ]] || \
-             [[ ! "$INITIAL_ADMIN_USER" =~ ^[A-Za-z0-9_.-]{1,50}$ ]]; then
-            echo "One or more required production variables are empty."
+          if [[ ! "$APP_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "APP_DOMAIN must be a valid hostname."
+            exit 1
+          fi
+
+          if [[ ! "$JWT_ISSUER" =~ ^[A-Za-z0-9_.:/-]+$ ]]; then
+            echo "JWT_ISSUER contains unsupported characters."
+            exit 1
+          fi
+
+          if [[ ! "$JWT_AUDIENCE" =~ ^[A-Za-z0-9_.:/-]+$ ]]; then
+            echo "JWT_AUDIENCE contains unsupported characters."
+            exit 1
+          fi
+
+          if [[ ! "$INITIAL_ADMIN_USER" =~ ^[A-Za-z0-9_.-]{1,50}$ ]]; then
+            echo "INITIAL_ADMIN_USER must be 1-50 characters and contain only letters," \
+              "numbers, dots, underscores or hyphens."
             exit 1
           fi
 
