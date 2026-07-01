@@ -110,12 +110,9 @@ app.UseCors("AngularPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Swagger is intentionally public and is exposed through Caddy at /api/swagger.
+app.UseSwagger();
+app.UseSwaggerUI();
 
 
 var summaries = new[]
